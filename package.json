@@ -1,0 +1,19 @@
+{
+  "name": "cli-todo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "module": "src/index.ts",
+  "bin": {
+    "todo": "src/index.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "install:bin": "mkdir -p $HOME/.local/bin && printf '#!/bin/sh\\nexec bun run %s/src/index.ts \"$@\"\\n' \"$PWD\" > $HOME/.local/bin/todo && chmod +x $HOME/.local/bin/todo && echo 'Installed todo shim at ~/.local/bin/todo (runs live source from '$PWD')'",
+    "todo": "bun run src/index.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.6.0"
+  }
+}
