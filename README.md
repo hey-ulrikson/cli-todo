@@ -17,7 +17,8 @@ bun run install:bin                 # writes a shim at ~/.local/bin/todo that ru
 |---|---|
 | `todo` / `todo list` | Open tasks grouped by status. |
 | `todo today [--n 5]` | Top-ranked open tasks for today. |
-| `todo add "<text>"` | AI classifies status, urgency, title, note. |
+| `todo do "<text>"` | AI classifies status, urgency, title, note, and adds a task. |
+| `todo edit "<text>"` | AI applies a freeform change to an open task (reword, status, split, mark done). |
 | `todo done "<text>"` | AI matches free text against open tasks; marks one done. |
 | `todo doctor` | Sanity check (env, DB, memory). |
 
