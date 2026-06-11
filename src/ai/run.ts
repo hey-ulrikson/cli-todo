@@ -5,14 +5,12 @@ import { resolveDbPath, todayDate } from '../util';
 import type { Task } from '../task';
 import { MEMORY } from './memory';
 import { describeSchema } from './schema';
-import cleanPrompt from '../prompts/clean.md' with { type: 'text' };
 import donePrompt from '../prompts/done.md' with { type: 'text' };
 import doPrompt from '../prompts/do.md' with { type: 'text' };
 import editPrompt from '../prompts/edit.md' with { type: 'text' };
-import movePrompt from '../prompts/move.md' with { type: 'text' };
 import dbSkill from '../../.claude/skills/db/SKILL.md' with { type: 'text' };
 
-export type Subcommand = 'done' | 'do' | 'move' | 'clean' | 'edit';
+export type Subcommand = 'done' | 'do' | 'edit';
 
 export interface ClaudeResult {
   code: number;
@@ -42,9 +40,7 @@ export interface Writer {
 export const WRITERS: Record<Subcommand, Writer> = {
   do: { model: 'sonnet', prompt: doPrompt, verb: 'Added', takesInput: true, followup: 'today' },
   done: { model: 'haiku', prompt: donePrompt, verb: 'Done', takesInput: true, followup: 'today' },
-  move: { model: 'haiku', prompt: movePrompt, verb: 'Moved', takesInput: true, followup: 'today' },
   edit: { model: 'opus', prompt: editPrompt, verb: 'Done', takesInput: true, followup: 'today' },
-  clean: { model: 'opus', prompt: cleanPrompt, verb: 'Cleaned', takesInput: false, followup: 'list' },
 };
 
 function spawnClaude(model: string): Bun.Subprocess<'pipe', 'pipe', 'inherit'> {
