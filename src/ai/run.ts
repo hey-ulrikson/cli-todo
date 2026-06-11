@@ -33,14 +33,12 @@ export interface Writer {
   model: string;
   prompt: string;
   verb: string;
-  takesInput: boolean;
-  followup: 'today' | 'list';
 }
 
 export const WRITERS: Record<Subcommand, Writer> = {
-  do: { model: 'sonnet', prompt: doPrompt, verb: 'Added', takesInput: true, followup: 'today' },
-  done: { model: 'haiku', prompt: donePrompt, verb: 'Done', takesInput: true, followup: 'today' },
-  edit: { model: 'opus', prompt: editPrompt, verb: 'Done', takesInput: true, followup: 'today' },
+  do: { model: 'sonnet', prompt: doPrompt, verb: 'Added' },
+  done: { model: 'haiku', prompt: donePrompt, verb: 'Done' },
+  edit: { model: 'opus', prompt: editPrompt, verb: 'Done' },
 };
 
 function spawnClaude(model: string): Bun.Subprocess<'pipe', 'pipe', 'inherit'> {
