@@ -32,6 +32,7 @@ async function handle(req: Request, db: Database): Promise<Response> {
   if (req.method === 'POST' && pathname === '/add') return addTask(req, db);
   if (req.method === 'POST' && pathname === '/done') return mutate(req, db, (id) => markDone(db, id));
   if (req.method === 'POST' && pathname === '/status') return mutate(req, db, (id, body) => setStatus(db, id, body.get('status')));
+  if (req.method === 'POST' && pathname === '/rename') return mutate(req, db, (id, body) => renameTask(db, id, body.get('title')));
   if (pathname === '/') return html(page(db));
   return new Response('not found', { status: 404 });
 }
@@ -61,6 +62,13 @@ function setStatus(db: Database, id: number, status: string | null): void {
   const urgency = status === 'waiting' ? 'yellow' : undefined;
   if (urgency) db.run('UPDATE tasks SET status=?, urgency=?, updated_at=? WHERE id=?', [status, urgency, nowSec(), id]);
   else db.run('UPDATE tasks SET status=?, updated_at=? WHERE id=?', [status, nowSec(), id]);
+}
+
+// Edits the stored title verbatim — no LLM. Display still strips tags/periods on render.
+function renameTask(db: Database, id: number, title: string | null): void {
+  const next = title?.trim();
+  if (!next) return;
+  db.run('UPDATE tasks SET title=?, updated_at=? WHERE id=?', [next, nowSec(), id]);
 }
 
 function page(db: Database): string {
@@ -99,7 +107,9 @@ function row(task: Task, now: number, index: number): string {
   const note = noteText ? `<span class="note">${esc(noteText)}</span>` : '';
   return `<div class="row" style="--i:${index}">
     <span class="dot ${effectiveUrgency(t, now)}"></span>
-    <span class="title">${esc(t.title)}${note}</span>
+    <span class="title">
+      <form class="rename" method="post" action="/rename"><input type="hidden" name="id" value="${t.id}"><input class="rename-input" name="title" value="${esc(t.title)}" autocomplete="off" aria-label="Rename task"></form>${note}
+    </span>
     <span class="actions">
       <form method="post" action="/done"><input type="hidden" name="id" value="${t.id}"><button class="done" aria-label="Mark done" title="Mark done">✓</button></form>
       ${moveSelect(t)}
@@ -192,9 +202,20 @@ const SHELL = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta 
   .dot.yellow { --dotc: var(--yellow); background: var(--yellow); }
   .dot.blue { --dotc: var(--blue); background: var(--blue); }
 
-  .title { flex: 1; min-width: 0; letter-spacing: -.011em; }
-  .note { color: var(--ink-dim); }
-  .note::before { content: "·"; margin: 0 .45ch; color: var(--ink-faint); }
+  .title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .35rem; letter-spacing: -.011em; }
+  .rename { width: 100%; }
+  /* borderless input that reads as the title text until you focus it */
+  .rename-input {
+    width: 100%; font: inherit; color: inherit; letter-spacing: inherit; background: transparent;
+    border: 0; border-radius: 6px; padding: .12rem .3rem; margin: -.12rem -.3rem;
+    text-overflow: ellipsis; transition: background .15s ease, box-shadow .15s ease;
+  }
+  .rename-input:hover { background: rgba(0,0,0,.03); }
+  .rename-input:focus { outline: none; background: var(--bg); box-shadow: 0 0 0 3px rgba(0,122,255,.18); }
+  .note {
+    align-self: flex-start; font: 510 .72rem var(--text); color: var(--ink-dim);
+    background: rgba(0,0,0,.05); border-radius: 980px; padding: .3rem .85rem; line-height: 1.3; letter-spacing: 0;
+  }
 
   .actions { display: flex; align-items: center; gap: 1.1rem; flex: none; padding-left: .5rem; }
   /* keep resting rows clean — reveal the move-to-column control on hover/focus */
