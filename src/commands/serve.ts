@@ -10,6 +10,9 @@ import { nowSec, resolveDbPath, startOfDaySec } from '../util';
 
 type OpenStatus = (typeof SECTION_ORDER)[number];
 
+// Dimmed and compacted in the UI, mirroring how the terminal grays these out.
+const QUIET: ReadonlySet<OpenStatus> = new Set(['waiting', 'someday']);
+
 function statusLabel(status: OpenStatus): string {
   const { emoji, label } = STATUS_DISPLAY[status];
   return `${emoji} ${label}`;
@@ -86,7 +89,8 @@ function masthead(openCount: number, doneToday: number, now: number): string {
 function section(status: OpenStatus, tasks: Task[], now: number, startIndex: number): string {
   const { emoji, label } = STATUS_DISPLAY[status];
   const rows = tasks.map((t, k) => row(t, now, startIndex + k)).join('');
-  return `<section><h2><span class="emoji">${emoji}</span><span class="label">${esc(label)}</span><span class="count">${tasks.length}</span></h2><div class="group">${rows}</div></section>`;
+  const cls = QUIET.has(status) ? ' class="quiet"' : '';
+  return `<section${cls}><h2><span class="emoji">${emoji}</span><span class="label">${esc(label)}</span><span class="count">${tasks.length}</span></h2><div class="group">${rows}</div></section>`;
 }
 
 function row(task: Task, now: number, index: number): string {
@@ -212,6 +216,14 @@ const SHELL = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta 
   }
   select:hover { color: var(--ink); }
   form { margin: 0; }
+
+  /* waiting / someday: dimmed and tightened so they recede; full opacity on hover when you do want them */
+  section.quiet { opacity: .5; margin-bottom: 1.5rem; transition: opacity .2s ease; }
+  section.quiet:hover { opacity: 1; }
+  section.quiet h2 { font-size: .82rem; margin-bottom: .5rem; }
+  section.quiet .group { box-shadow: 0 1px 2px rgba(0,0,0,.03); }
+  section.quiet .row { padding: .58rem 1.15rem; font-size: .9rem; }
+  section.quiet .dot { transform: scale(.85); }
 
   .empty { color: var(--ink-dim); font: 600 1.6rem/1.3 var(--rounded); letter-spacing: -.02em; text-align: center; margin: 6rem 0; }
 </style></head><body>{{body}}</body></html>`;
