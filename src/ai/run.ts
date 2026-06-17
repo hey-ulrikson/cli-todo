@@ -32,13 +32,12 @@ export async function runClaude(sub: Subcommand, userText: string): Promise<Clau
 export interface Writer {
   model: string;
   prompt: string;
-  verb: string;
 }
 
 export const WRITERS: Record<Subcommand, Writer> = {
-  do: { model: 'sonnet', prompt: doPrompt, verb: 'Added' },
-  done: { model: 'haiku', prompt: donePrompt, verb: 'Done' },
-  edit: { model: 'opus', prompt: editPrompt, verb: 'Done' },
+  do: { model: 'sonnet', prompt: doPrompt },
+  done: { model: 'haiku', prompt: donePrompt },
+  edit: { model: 'opus', prompt: editPrompt },
 };
 
 function spawnClaude(model: string): Bun.Subprocess<'pipe', 'pipe', 'inherit'> {
