@@ -2,6 +2,7 @@ import { WRITERS, type Subcommand } from './ai/run';
 import { runWriter } from './commands/write';
 import { runDoctor } from './commands/doctor';
 import { runList } from './commands/list';
+import { runServe } from './commands/serve';
 import { runToday } from './commands/today';
 
 await main(Bun.argv.slice(2));
@@ -17,6 +18,8 @@ async function main(argv: readonly string[]): Promise<void> {
         return runList();
       case 'today':
         return runToday(rest);
+      case 'serve':
+        return runServe();
       case 'doctor':
         return runDoctor();
       default:
