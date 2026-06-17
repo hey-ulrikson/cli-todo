@@ -1,4 +1,4 @@
-export const STATUSES = ['someday', 'general', 'coding', 'waiting', 'done'] as const;
+export const STATUSES = ['someday', 'general', 'coding', 'review', 'waiting', 'done'] as const;
 export const URGENCIES = ['red', 'yellow', 'blue'] as const;
 
 export type Status = (typeof STATUSES)[number];

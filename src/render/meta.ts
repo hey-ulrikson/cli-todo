@@ -7,9 +7,14 @@ export type MetaOpts = { trimNoteToFirstSentence: boolean };
 export function metaSuffix(task: Task, nowSec: number, opts: RenderOpts, meta: MetaOpts): string {
   const hint = dueHint(task, nowSec);
   const hintBlock = hint ? ` ${dim(`(${hint})`, opts)}` : '';
-  const noteText = task.note ? (meta.trimNoteToFirstSentence ? firstSentence(task.note) : task.note) : '';
+  const noteText = task.note ? stripTrailingPeriod(meta.trimNoteToFirstSentence ? firstSentence(task.note) : task.note) : '';
   const noteBlock = noteText ? ` ${dim(`— ${noteText}`, opts)}` : '';
   return hintBlock + noteBlock;
+}
+
+/** A note is one phrase — the closing period reads as clutter in a scannable list. */
+export function stripTrailingPeriod(s: string): string {
+  return s.replace(/\.\s*$/, '');
 }
 
 // An untagged task is the user's by default — others always carry a name — so

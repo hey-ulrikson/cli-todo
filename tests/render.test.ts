@@ -71,7 +71,7 @@ describe('renderList', () => {
       { ...generalYellow(2, 'plan the parser', 1), status: 'general', note: 'Own.' },
     ];
     const lines = renderList(tasks, 0).split('\n');
-    expect(lines).toContain('  🟡 PR 201 Finish — follow-up fixes.');
+    expect(lines).toContain('  🟡 PR 201 Finish — follow-up fixes');
     expect(lines).toContain('  🟡 plan the parser');
   });
 
@@ -115,9 +115,13 @@ describe('renderToday', () => {
     expect(renderToday(tasks, 0)).toBe(expected);
   });
 
-  test('a coding-status review task lands in Reviews, not Coding', () => {
-    const tasks: Task[] = [{ ...generalYellow(1, 'Review PR #99', 1_700_000_000), status: 'coding' }];
-    expect(renderToday(tasks, 1_700_000_000)).toBe('🔍 Reviews · 1\n🟡 PR #99');
+  test('review-status tasks land in Reviews; a review word in a coding title does not', () => {
+    const tasks: Task[] = [
+      { ...generalYellow(1, 'PR 99 Review', 1_700_000_000), status: 'review' },
+      { ...generalYellow(2, 'Review my own design notes', 1_699_999_999), status: 'coding' },
+    ];
+    const expected = ['💻 Coding · 1', '🟡 Review my own design notes', '', '🔍 Reviews · 1', '🟡 PR 99 Review'].join('\n');
+    expect(renderToday(tasks, 1_700_000_000)).toBe(expected);
   });
 
   test('strips the "Own" tag from every section — an untagged task is the user\'s by default', () => {
@@ -220,10 +224,10 @@ describe('renderToday', () => {
     expect(out).toContain('🟡 due soon (due tomorrow)');
   });
 
-  test('splits review tasks into a labeled section below non-review work, stripping the review word', () => {
+  test('puts review-status tasks in their own section below Focus and Coding, titles untouched', () => {
     const tasks: Task[] = [
       ...SPEC_TASKS,
-      { ...generalYellow(100, 'Review PR #99', 95 * 3600) },
+      { ...generalYellow(100, 'PR 99 Review', 95 * 3600), status: 'review' },
     ];
     const expected = [
       '🎯 Focus · 1',
@@ -233,51 +237,24 @@ describe('renderToday', () => {
       '🟡 PR101 (Alice) — CI/CD fix',
       '',
       '🔍 Reviews · 1',
-      '🟡 PR #99',
+      '🟡 PR 99 Review',
     ].join('\n');
     expect(renderToday(tasks, 0)).toBe(expected);
   });
 
   test('reviews-only output starts with the header and a single item', () => {
-    const tasks: Task[] = [{ ...generalYellow(1, 'Review the design doc', 1_700_000_000) }];
-    expect(renderToday(tasks, 1_700_000_000)).toBe('🔍 Reviews · 1\n🟡 the design doc');
+    const tasks: Task[] = [{ ...generalYellow(1, 'PR 7 Review', 1_700_000_000), status: 'review' }];
+    expect(renderToday(tasks, 1_700_000_000)).toBe('🔍 Reviews · 1\n🟡 PR 7 Review');
   });
 
-  test('matches review as a prefix-bound word — Reviewed/Reviewing match, preview does not', () => {
-    const t = 1_700_000_000;
-    const tasks: Task[] = [
-      { ...generalYellow(1, 'Preview the demo', t) },
-      { ...generalYellow(2, 'Reviewed by Frank', t - 1) },
-    ];
-    const out = renderToday(tasks, t);
-    const [topGroup, reviewGroup] = out.split('\n\n');
-    expect(topGroup).toBe('🎯 Focus · 1\n🟡 Preview the demo');
-    expect(reviewGroup).toBe('🔍 Reviews · 1\n🟡 by Frank');
+  test('the review word in a non-review-status title is no longer special — it stays in Focus', () => {
+    const tasks: Task[] = [{ ...generalYellow(1, 'Review my reading list', 1_700_000_000), status: 'general' }];
+    expect(renderToday(tasks, 1_700_000_000)).toBe('🎯 Focus · 1\n🟡 Review my reading list');
   });
 
-  test('strips trailing review word and dangling separators', () => {
-    const tasks: Task[] = [{ ...generalYellow(1, 'PR 204 Review', 1_700_000_000) }];
-    expect(renderToday(tasks, 1_700_000_000)).toBe('🔍 Reviews · 1\n🟡 PR 204');
-  });
-
-  test('marks re-reviews with a ↻ prefix', () => {
-    const tasks: Task[] = [
-      { ...generalYellow(1, 'PR 203 Review — Carol. Re-review.', 1_700_000_000) },
-    ];
-    expect(renderToday(tasks, 1_700_000_000)).toBe('🔍 Reviews · 1\n🟡 ↻ PR 203 — Carol');
-  });
-
-  test('re-review strip does not leave a dangling "Re-"', () => {
-    const tasks: Task[] = [{ ...generalYellow(1, 'Re-review the design doc', 1_700_000_000) }];
-    expect(renderToday(tasks, 1_700_000_000)).toBe('🔍 Reviews · 1\n🟡 ↻ the design doc');
-  });
-
-  test('detects re-review from the note field, not just the title', () => {
-    const tasks: Task[] = [
-      { ...generalYellow(1, 'PR 205 Review', 1_700_000_000), note: 'Dave. Re-review.' },
-    ];
-    const out = renderToday(tasks, 1_700_000_000);
-    expect(out.split('\n')[1]).toStartWith('🟡 ↻ PR 205');
+  test('strips the trailing period from a rendered note', () => {
+    const tasks: Task[] = [{ ...generalYellow(1, 'PR 205 Review', 1_700_000_000), status: 'review', note: 'Dave, re-review.' }];
+    expect(renderToday(tasks, 1_700_000_000)).toBe('🔍 Reviews · 1\n🟡 PR 205 Review — Dave, re-review');
   });
 });
 

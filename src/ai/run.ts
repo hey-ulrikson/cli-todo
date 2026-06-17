@@ -1,6 +1,6 @@
 import { openDb } from '../db';
 import { loadOpenTasks } from '../queries';
-import { startSpinner } from '../spinner';
+import { startSpinner, type Spinner } from '../spinner';
 import { resolveDbPath, todayDate } from '../util';
 import type { Task } from '../task';
 import { MEMORY } from './memory';
@@ -14,20 +14,24 @@ export type Subcommand = 'done' | 'do' | 'edit';
 
 export interface ClaudeResult {
   code: number;
+  /** A one-line follow-up question Claude emitted via `ASK:` — present only for `do`. */
+  ask?: string | undefined;
 }
 
-export async function runClaude(sub: Subcommand, userText: string): Promise<ClaudeResult> {
-  const spinner = startSpinner(`claude ${sub}`);
+export async function runClaude(sub: Subcommand, userText: string, quiet = false): Promise<ClaudeResult> {
+  const spinner = quiet ? SILENT_SPINNER : startSpinner(`claude ${sub}`);
   try {
     const proc = spawnClaude(WRITERS[sub].model);
     proc.stdin.write(buildPrompt(sub, userText));
     await proc.stdin.end();
-    const [, code] = await Promise.all([streamStatus(proc.stdout, spinner.update), proc.exited]);
-    return { code: code ?? 1 };
+    const [ask, code] = await Promise.all([streamStatus(proc.stdout, spinner.update), proc.exited]);
+    return { code: code ?? 1, ask };
   } finally {
     spinner.stop();
   }
 }
+
+const SILENT_SPINNER: Spinner = { update: () => {}, stop: () => {} };
 
 export interface Writer {
   model: string;
@@ -103,8 +107,10 @@ function taskRow(t: Task): string {
   return `${t.id}\t${t.status}\t${t.urgency}\tdue=${due}\t${t.title}${note}`;
 }
 
-async function streamStatus(stream: ReadableStream<Uint8Array>, onStatus: (label: string) => void): Promise<void> {
+/** Drives the spinner from Claude's event stream and returns any `ASK:` follow-up it emitted. */
+async function streamStatus(stream: ReadableStream<Uint8Array>, onStatus: (label: string) => void): Promise<string | undefined> {
   let buffer = '';
+  let ask: string | undefined;
   const decoder = new TextDecoder();
   for await (const chunk of stream as unknown as AsyncIterable<Uint8Array>) {
     buffer += decoder.decode(chunk, { stream: true });
@@ -115,10 +121,23 @@ async function streamStatus(stream: ReadableStream<Uint8Array>, onStatus: (label
       if (!line) continue;
       const event = parseEvent(line);
       if (!event) continue;
+      ask ??= askFrom(event);
       const status = statusFor(event);
       if (status) onStatus(status);
     }
   }
+  return ask;
+}
+
+/** Pulls the question out of an `ASK: <question>` line in an assistant text block, if present. */
+function askFrom(event: StreamEvent): string | undefined {
+  if (event.type !== 'assistant') return undefined;
+  for (const block of event.message?.content ?? []) {
+    if (block.type !== 'text' || typeof block.text !== 'string') continue;
+    const match = block.text.match(/^\s*ASK:\s*(.+)$/m);
+    if (match?.[1]) return match[1].trim();
+  }
+  return undefined;
 }
 
 function parseEvent(line: string): StreamEvent | null {

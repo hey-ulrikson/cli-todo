@@ -10,10 +10,9 @@ export function renderToday(
   doneToday = 0,
 ): string {
   const eligible = rank(tasks.filter((t) => isEligibleForToday(t, nowSec)), nowSec).map(withOwnTagStripped);
-  const reviews = eligible.filter(isReviewTask).map(withReviewWordStripped);
-  const nonReview = eligible.filter((t) => !isReviewTask(t));
-  const coding = nonReview.filter((t) => t.status === 'coding');
-  const focus = nonReview.filter((t) => t.status !== 'coding');
+  const reviews = eligible.filter((t) => t.status === 'review');
+  const coding = eligible.filter((t) => t.status === 'coding');
+  const focus = eligible.filter((t) => t.status !== 'review' && t.status !== 'coding');
   return [
     todaySection('🎯 Focus', focus, nowSec, opts),
     todaySection('💻 Coding', coding, nowSec, opts),
@@ -43,19 +42,4 @@ function isEligibleForToday(task: Task, nowSec: number): boolean {
   if (isHiddenFromToday(task, nowSec)) return false;
   if (effectiveUrgency(task, nowSec) === 'blue') return false;
   return true;
-}
-
-function isReviewTask(task: Task): boolean {
-  return /\breview/i.test(task.title);
-}
-
-function withReviewWordStripped(task: Task): Task {
-  const isReReview = /\bre-?review\b/i.test(`${task.title} ${task.note ?? ''}`);
-  const stripped = task.title
-    .replace(/\bre-?review\w*\b/gi, '')
-    .replace(/\breview\w*\b/gi, '')
-    .replace(/\s+/g, ' ')
-    .replace(/^[\s\-—–:,.]+|[\s\-—–:,.]+$/g, '')
-    .trim();
-  return { ...task, title: isReReview ? `↻ ${stripped}` : stripped };
 }

@@ -4,7 +4,7 @@ import { STATUSES, URGENCIES } from '../src/task';
 
 describe('enum constants', () => {
   test('STATUSES lists every kanban column', () => {
-    expect(STATUSES).toEqual(['someday', 'general', 'coding', 'waiting', 'done']);
+    expect(STATUSES).toEqual(['someday', 'general', 'coding', 'review', 'waiting', 'done']);
   });
 
   test('URGENCIES lists every urgency level', () => {

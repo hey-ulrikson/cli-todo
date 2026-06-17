@@ -8,9 +8,10 @@ await main(Bun.argv.slice(2));
 
 async function main(argv: readonly string[]): Promise<void> {
   const cmd = argv[0] ?? 'list';
-  const rest = argv.slice(1);
+  const bg = argv.includes('--bg') || argv.includes('-q');
+  const rest = argv.slice(1).filter((a) => a !== '--bg' && a !== '-q');
   try {
-    if (isWriter(cmd)) return await runWriter(cmd, rest.join(' '));
+    if (isWriter(cmd)) return await runWriter(cmd, rest.join(' '), { bg });
     switch (cmd) {
       case 'list':
         return runList();
