@@ -93,7 +93,7 @@ function masthead(openCount: number, doneToday: number, now: number): string {
   const date = new Date(now * 1000).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
   const count = openCount === 0 ? 'nothing open' : `${openCount} open`;
   const done = doneToday > 0 ? `<span class="streak">✓ ${doneToday} done today</span>` : '';
-  return `<header class="masthead"><h1>todo<b>.</b></h1><div class="meta"><span class="today">${esc(date)} <span class="sep">·</span> ${count}</span>${done}</div></header>`;
+  return `<header class="masthead"><h1>todo<b>.</b></h1><div class="meta"><span class="today">${esc(date)}</span><span class="count-line">${count}${done}</span></div></header>`;
 }
 
 function section(status: OpenStatus, tasks: Task[], now: number, startIndex: number, prStatuses: Map<number, string>): string {
@@ -110,9 +110,10 @@ function row(task: Task, now: number, index: number, prStatuses: Map<number, str
   return `<div class="row" style="--i:${index}">
     <span class="dot ${effectiveUrgency(t, now)}"></span>
     <span class="title">
-      <form class="rename" method="post" action="/rename"><input type="hidden" name="id" value="${t.id}"><input class="rename-input" name="title" value="${esc(t.title)}" autocomplete="off" aria-label="Rename task"></form>${note}${prBadge(t.title, prStatuses)}
+      <form class="rename" method="post" action="/rename"><input type="hidden" name="id" value="${t.id}"><input class="rename-input" name="title" value="${esc(t.title)}" autocomplete="off" aria-label="Rename task"></form>${note}
     </span>
     <span class="actions">
+      ${prBadge(t.title, prStatuses)}
       <form method="post" action="/done"><input type="hidden" name="id" value="${t.id}"><button class="done" aria-label="Mark done" title="Mark done">✓</button></form>
       ${moveSelect(t)}
     </span>
@@ -216,11 +217,10 @@ const SHELL = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta 
   .masthead { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 2.75rem; }
   .masthead h1 { font: 700 2.5rem/1 var(--rounded); letter-spacing: -.022em; margin: 0; }
   .masthead h1 b { color: var(--blue); font-weight: 700; }
-  .meta { display: flex; flex-direction: column; align-items: flex-end; gap: .45rem; }
-  .today, .streak { font: 590 .8rem/1 var(--text); margin: 0; letter-spacing: -.01em; border-radius: 980px; padding: .45rem .8rem; white-space: nowrap; }
-  .today { color: var(--ink-dim); background: var(--card); box-shadow: 0 1px 3px rgba(0,0,0,.06); }
-  .today .sep { color: var(--ink-faint); margin: 0 .35rem; }
-  .streak { color: var(--green); background: color-mix(in srgb, var(--green) 12%, transparent); }
+  .meta { display: flex; flex-direction: column; align-items: flex-end; gap: .2rem; }
+  .today { font: 600 .82rem/1.3 var(--text); color: var(--ink); letter-spacing: -.012em; white-space: nowrap; }
+  .count-line { font: 500 .78rem/1.3 var(--text); color: var(--ink-faint); letter-spacing: -.006em; white-space: nowrap; }
+  .streak { color: var(--green); margin-left: .55rem; }
 
   form.add { display: flex; gap: .65rem; margin-bottom: 2.9rem; }
   form.add input {
@@ -246,7 +246,7 @@ const SHELL = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta 
   h2 .count { font: 500 .82rem var(--text); color: var(--ink-faint); letter-spacing: -.01em; }
 
   /* iOS-style grouped list: one rounded card per section, hairline-separated rows */
-  .group { background: var(--card); border-radius: 18px; box-shadow: 0 1px 3px rgba(0,0,0,.04), 0 12px 30px -16px rgba(0,0,0,.12); overflow: hidden; }
+  .group { background: var(--card); border-radius: 16px; border: .5px solid var(--sep); box-shadow: 0 1px 2px rgba(0,0,0,.03); overflow: hidden; }
   .row {
     display: flex; align-items: center; gap: .85rem; padding: 1.05rem 1.15rem; position: relative;
     animation: rise .5s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i) * 40ms);
@@ -257,12 +257,12 @@ const SHELL = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta 
   @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
   @media (prefers-reduced-motion: reduce) { .row { animation: none; } }
 
-  .dot { width: .58rem; height: .58rem; border-radius: 50%; flex: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--dotc) 16%, transparent); }
-  .dot.red { --dotc: var(--red); background: var(--red); }
-  .dot.yellow { --dotc: var(--yellow); background: var(--yellow); }
-  .dot.blue { --dotc: var(--blue); background: var(--blue); }
+  .dot { width: .5rem; height: .5rem; border-radius: 50%; flex: none; }
+  .dot.red { background: var(--red); }
+  .dot.yellow { background: var(--yellow); }
+  .dot.blue { background: var(--blue); }
 
-  .title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .35rem; letter-spacing: -.011em; }
+  .title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .15rem; letter-spacing: -.011em; }
   .rename { width: 100%; }
   /* borderless input that reads as the title text until you focus it */
   .rename-input {
@@ -272,14 +272,16 @@ const SHELL = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta 
   }
   .rename-input:hover { background: rgba(0,0,0,.03); }
   .rename-input:focus { outline: none; background: var(--bg); box-shadow: 0 0 0 3px rgba(0,122,255,.18); }
+  /* note is now a quiet subtitle, not a pill — kills the pill-over-pill stack */
   .note {
-    align-self: flex-start; font: 510 .72rem var(--text); color: var(--ink-dim);
-    background: rgba(0,0,0,.05); border-radius: 980px; padding: .3rem .85rem; line-height: 1.3; letter-spacing: 0;
+    align-self: flex-start; font: 500 .78rem/1.3 var(--text); color: var(--ink-faint);
+    letter-spacing: -.003em; padding: 0 .3rem; max-width: 100%;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .pr-status {
-    align-self: flex-start; font: 590 .66rem var(--text); text-transform: uppercase; letter-spacing: .04em;
-    border-radius: 980px; padding: .22rem .6rem; line-height: 1; text-decoration: none; cursor: pointer;
-    color: var(--badgec); background: color-mix(in srgb, var(--badgec) 14%, transparent);
+    font: 600 .62rem var(--text); text-transform: uppercase; letter-spacing: .05em;
+    border-radius: 980px; padding: .26rem .56rem; line-height: 1; text-decoration: none; cursor: pointer; white-space: nowrap;
+    color: var(--badgec); background: color-mix(in srgb, var(--badgec) 13%, transparent);
     transition: background .15s ease;
   }
   .pr-status:hover { background: color-mix(in srgb, var(--badgec) 26%, transparent); }
@@ -288,7 +290,7 @@ const SHELL = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta 
   .pr-status.closed { --badgec: var(--red); }
   .pr-status.draft { --badgec: var(--ink-faint); }
 
-  .actions { display: flex; align-items: center; gap: 1.1rem; flex: none; padding-left: .5rem; }
+  .actions { display: flex; align-items: center; gap: .9rem; flex: none; padding-left: .6rem; }
   /* keep resting rows clean — reveal the move-to-column control on hover/focus */
   .move { opacity: 0; transition: opacity .18s ease; }
   .row:hover .move, .move:focus-within { opacity: 1; }
