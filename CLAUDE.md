@@ -15,7 +15,7 @@ Treat every tracked line — code, comments, commits, fixtures, prompts, docs �
 
 Single-binary Bun CLI. Two kinds of subcommand:
 
-1. **Read paths** (`list`, `today`, `doctor`) — pure SQLite, no AI, no network. Snapshots in `tests/render.test.ts` lock the output format — they're a contract.
+1. **Read paths** (`today`, `doctor`) — pure SQLite, no AI, no network. Snapshots in `tests/render.test.ts` lock the output format — they're a contract. Bare `todo` defaults to `today`.
 2. **Write paths** (`add`, `done`, `do`, `move`, `clean`) — shell out to `claude -p` (Claude Code in print mode). The wrapper spawns Claude with `--allowed-tools Bash`, Claude operates the SQLite DB directly via `sqlite3`, and the wrapper prints a static confirmation. Claude's stdout is not consumed — clarification questions there go nowhere.
 
 > **Do not propose migrating write paths to the Anthropic SDK or Claude Agent SDK.** Both require an `ANTHROPIC_API_KEY` with paid credits; the Pro/Max subscription's OAuth token is restricted to Claude Code and claude.ai per the consumer ToS and cannot authenticate the SDKs. Shelling out to `claude -p` is the deliberate choice that keeps this CLI on the user's existing subscription. Verified 2026-05-11.

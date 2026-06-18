@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { PLAIN, renderList, renderToday } from '../src/render';
+import { PLAIN, renderToday } from '../src/render';
 import type { Task } from '../src/task';
 import { SPEC_TASKS } from './fixtures/seed';
 
@@ -18,74 +18,6 @@ const generalBlue = (id: number, title: string, created_at: number): Task => ({
 const generalYellow = (id: number, title: string, created_at: number): Task => ({
   ...generalBlue(id, title, created_at),
   urgency: 'yellow',
-});
-
-describe('renderList', () => {
-  test('matches the spec example byte-for-byte', () => {
-    const expected = [
-      '📅 General · 1',
-      '  🔴 Prepare for new intern — Friday 2026-05-08, due Mon 2026-05-11',
-      '',
-      '💻 Coding · 2',
-      '  🟡 PR101 (Alice) — CI/CD fix',
-      '  🔵 PR102 — feature rollout',
-      '',
-      '🤝 Waiting On · 2',
-      '  🔵 PR103 — Replace proxy with direct OAuth',
-      '  🔵 PR104 — Asset categorization',
-      '',
-      '💭 Someday / Maybe · 1',
-      '  🔵 Run `interview` script',
-    ].join('\n');
-    expect(renderList(SPEC_TASKS, 0)).toBe(expected);
-  });
-
-  test('excludes done tasks', () => {
-    const out = renderList(SPEC_TASKS, 0);
-    expect(out).not.toContain('Done');
-    expect(out).not.toContain('Invite Bob to Acme');
-  });
-
-  test('omits empty sections entirely', () => {
-    const onlyGeneral = SPEC_TASKS.filter((t) => t.status === 'general');
-    const out = renderList(onlyGeneral, 0);
-    expect(out).not.toContain('Coding');
-    expect(out).not.toContain('Done');
-    expect(out.startsWith('📅 General')).toBe(true);
-  });
-
-  test('returns empty string for an empty list', () => {
-    expect(renderList([], 0)).toBe('');
-  });
-
-  test('section headers show a task-count badge', () => {
-    const out = renderList(SPEC_TASKS, 0);
-    expect(out).toContain('📅 General · 1');
-    expect(out).toContain('💻 Coding · 2');
-    expect(out).toContain('🤝 Waiting On · 2');
-  });
-
-  test('strips the "Own" tag from every section — an untagged task is the user\'s by default', () => {
-    const tasks: Task[] = [
-      { ...generalYellow(1, 'PR 201 Finish', 2), status: 'coding', note: 'Own. follow-up fixes.' },
-      { ...generalYellow(2, 'plan the parser', 1), status: 'general', note: 'Own.' },
-    ];
-    const lines = renderList(tasks, 0).split('\n');
-    expect(lines).toContain('  🟡 PR 201 Finish — follow-up fixes');
-    expect(lines).toContain('  🟡 plan the parser');
-  });
-
-  test('ranks by urgency then created_at desc within a section', () => {
-    const tasks: Task[] = [
-      generalBlue(10, 'older blue', 1),
-      generalBlue(11, 'newer blue', 2),
-      { ...generalBlue(12, 'red', 1), urgency: 'red' },
-    ];
-    const lines = renderList(tasks, 0).split('\n');
-    expect(lines[1]).toContain('red');
-    expect(lines[2]).toContain('newer blue');
-    expect(lines[3]).toContain('older blue');
-  });
 });
 
 describe('renderToday', () => {
@@ -255,19 +187,5 @@ describe('renderToday', () => {
   test('strips the trailing period from a rendered note', () => {
     const tasks: Task[] = [{ ...generalYellow(1, 'PR 205 Review', 1_700_000_000), status: 'review', note: 'Dave, re-review.' }];
     expect(renderToday(tasks, 1_700_000_000)).toBe('🔍 Reviews · 1\n🟡 PR 205 Review — Dave, re-review');
-  });
-});
-
-describe('renderList date hints', () => {
-  test('appends (overdue Nd) / (due in Nd) after the title', () => {
-    const today = 1_700_000_000;
-    const day = 86_400;
-    const tasks: Task[] = [
-      { ...generalYellow(1, 'overdue task', today), due_at: today - 3 * day },
-      { ...generalBlue(2, 'in 5 days', today - 1), due_at: today + 5 * day },
-    ];
-    const out = renderList(tasks, today);
-    expect(out).toContain('🔴 overdue task (overdue 3d)');
-    expect(out).toContain('🔵 in 5 days (due in 5d)');
   });
 });
