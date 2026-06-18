@@ -5,6 +5,7 @@ describe('runChecks', () => {
   test('flags missing claude binary', () => {
     const results = runChecks({
       claudeBinary: null,
+      ghBinary: '/usr/local/bin/gh',
       dbPath: '/tmp/nope.db',
       memoryDir: '/tmp/nope',
     });
@@ -12,9 +13,20 @@ describe('runChecks', () => {
     expect(allOk(results)).toBe(false);
   });
 
+  test('flags missing gh binary', () => {
+    const results = runChecks({
+      claudeBinary: '/usr/local/bin/claude',
+      ghBinary: null,
+      dbPath: import.meta.dir,
+      memoryDir: import.meta.dir,
+    });
+    expect(allOk(results)).toBe(false);
+  });
+
   test('passes when env is sane', () => {
     const results = runChecks({
       claudeBinary: '/usr/local/bin/claude',
+      ghBinary: '/usr/local/bin/gh',
       dbPath: import.meta.dir,
       memoryDir: import.meta.dir,
     });

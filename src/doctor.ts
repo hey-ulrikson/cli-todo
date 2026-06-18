@@ -8,6 +8,7 @@ export interface CheckResult {
 
 export interface DoctorEnv {
   claudeBinary: string | null;
+  ghBinary: string | null;
   dbPath: string;
   memoryDir: string;
 }
@@ -15,6 +16,7 @@ export interface DoctorEnv {
 export function runChecks(env: DoctorEnv): CheckResult[] {
   return [
     checkClaudeBinary(env.claudeBinary),
+    checkGhBinary(env.ghBinary),
     checkDbPath(env.dbPath),
     checkMemoryDir(env.memoryDir),
   ];
@@ -26,6 +28,15 @@ function checkClaudeBinary(path: string | null): CheckResult {
     label: 'claude binary on PATH',
     ok: false,
     detail: 'install Claude Code (https://claude.com/claude-code)',
+  };
+}
+
+function checkGhBinary(path: string | null): CheckResult {
+  if (path) return { label: `gh binary at ${path}`, ok: true };
+  return {
+    label: 'gh binary on PATH',
+    ok: false,
+    detail: 'needed for PR status in `todo serve` (https://cli.github.com)',
   };
 }
 

@@ -20,6 +20,8 @@ Single-binary Bun CLI. Two kinds of subcommand:
 
 > **Do not propose migrating write paths to the Anthropic SDK or Claude Agent SDK.** Both require an `ANTHROPIC_API_KEY` with paid credits; the Pro/Max subscription's OAuth token is restricted to Claude Code and claude.ai per the consumer ToS and cannot authenticate the SDKs. Shelling out to `claude -p` is the deliberate choice that keeps this CLI on the user's existing subscription. Verified 2026-05-11.
 
+`serve` is the web UI — a read path that renders the list as HTML. One deliberate exception to "no network": when `TODO_GH_REPO` (`owner/repo`) is set, it shells out to `gh pr view` to badge each `PR <n>` row with its live GitHub state (open/merged/closed), cached briefly. Unset → no network, no badges. The repo stays in the env, never in this public repo.
+
 Per-subcommand contract: success → exit 0, stdout ignored. Failure (no match, multi-match, ambiguity, no-change) → prose to stderr, non-zero exit; the wrapper relays the code.
 
 ## Single source of truth
@@ -46,7 +48,7 @@ Don't restate these in markdown — they drift.
 - `main()` is the only catch site; everything else throws prose.
 - DB tests use `:memory:` SQLite, never the real file.
 - Snapshot tests are a contract — update them in the same commit as any output change.
-- `claude` must be on `$PATH`; `todo doctor` checks for it.
+- `claude` (always) and `gh` (for `serve` PR badges) must be on `$PATH`; `todo doctor` checks for both.
 
 ## Install detail worth knowing
 

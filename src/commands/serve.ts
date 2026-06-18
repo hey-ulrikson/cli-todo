@@ -29,19 +29,20 @@ export function runServe(): void {
 
 async function handle(req: Request, db: Database): Promise<Response> {
   const { pathname } = new URL(req.url);
-  if (req.method === 'POST' && pathname === '/add') return addTask(req, db);
+  if (req.method === 'POST' && pathname === '/edit') return freeform(req, db);
   if (req.method === 'POST' && pathname === '/done') return mutate(req, db, (id) => markDone(db, id));
   if (req.method === 'POST' && pathname === '/status') return mutate(req, db, (id, body) => setStatus(db, id, body.get('status')));
   if (req.method === 'POST' && pathname === '/rename') return mutate(req, db, (id, body) => renameTask(db, id, body.get('title')));
-  if (pathname === '/') return html(page(db));
+  if (pathname === '/') return html(await page(db));
   return new Response('not found', { status: 404 });
 }
 
-// Adds route through the same LLM `do` path as the terminal — natural text in, parsed task out.
-async function addTask(req: Request, db: Database): Promise<Response> {
+// Freeform box routes through the LLM `edit` catch-all — natural text in, any mutation out
+// (add, mark done, move, reword), not just adds.
+async function freeform(req: Request, db: Database): Promise<Response> {
   const text = new URLSearchParams(await req.text()).get('text')?.trim();
-  if (text) await runClaude('do', text, true);
-  return html(page(db));
+  if (text) await runClaude('edit', text, true);
+  return html(await page(db));
 }
 
 async function mutate(req: Request, db: Database, apply: (id: number, body: URLSearchParams) => void): Promise<Response> {
@@ -49,7 +50,7 @@ async function mutate(req: Request, db: Database, apply: (id: number, body: URLS
   const id = Number(body.get('id'));
   if (!Number.isInteger(id)) return new Response('bad id', { status: 400 });
   apply(id, body);
-  return html(page(db));
+  return html(await page(db));
 }
 
 function markDone(db: Database, id: number): void {
@@ -71,15 +72,16 @@ function renameTask(db: Database, id: number, title: string | null): void {
   db.run('UPDATE tasks SET title=?, updated_at=? WHERE id=?', [next, nowSec(), id]);
 }
 
-function page(db: Database): string {
+async function page(db: Database): Promise<string> {
   const now = nowSec();
   const open = loadOpenTasks(db).filter((t) => t.status !== 'done');
   const doneToday = countDoneSince(db, startOfDaySec(now));
+  const prStatuses = await fetchPrStatuses(open.map((t) => prNumber(t.title)).filter((n): n is number => n !== null));
   const groups = SECTION_ORDER.map((s) => ({ status: s, items: rank(open.filter((t) => t.status === s), now) })).filter((g) => g.items.length);
   let i = 0;
   const sections = groups
     .map((g) => {
-      const html = section(g.status, g.items, now, i);
+      const html = section(g.status, g.items, now, i, prStatuses);
       i += g.items.length;
       return html;
     })
@@ -94,21 +96,21 @@ function masthead(openCount: number, doneToday: number, now: number): string {
   return `<header class="masthead"><h1>todo<b>.</b></h1><div class="meta"><span class="today">${esc(date)} <span class="sep">·</span> ${count}</span>${done}</div></header>`;
 }
 
-function section(status: OpenStatus, tasks: Task[], now: number, startIndex: number): string {
+function section(status: OpenStatus, tasks: Task[], now: number, startIndex: number, prStatuses: Map<number, string>): string {
   const { emoji, label } = STATUS_DISPLAY[status];
-  const rows = tasks.map((t, k) => row(t, now, startIndex + k)).join('');
+  const rows = tasks.map((t, k) => row(t, now, startIndex + k, prStatuses)).join('');
   const cls = QUIET.has(status) ? ' class="quiet"' : '';
   return `<section${cls}><h2><span class="emoji">${emoji}</span><span class="label">${esc(label)}</span><span class="count">${tasks.length}</span></h2><div class="group">${rows}</div></section>`;
 }
 
-function row(task: Task, now: number, index: number): string {
+function row(task: Task, now: number, index: number, prStatuses: Map<number, string>): string {
   const t = withOwnTagStripped(task);
   const noteText = t.note ? stripTrailingPeriod(t.note) : '';
   const note = noteText ? `<span class="note">${esc(noteText)}</span>` : '';
   return `<div class="row" style="--i:${index}">
     <span class="dot ${effectiveUrgency(t, now)}"></span>
     <span class="title">
-      <form class="rename" method="post" action="/rename"><input type="hidden" name="id" value="${t.id}"><input class="rename-input" name="title" value="${esc(t.title)}" autocomplete="off" aria-label="Rename task"></form>${note}
+      <form class="rename" method="post" action="/rename"><input type="hidden" name="id" value="${t.id}"><input class="rename-input" name="title" value="${esc(t.title)}" autocomplete="off" aria-label="Rename task"></form>${note}${prBadge(t.title, prStatuses)}
     </span>
     <span class="actions">
       <form method="post" action="/done"><input type="hidden" name="id" value="${t.id}"><button class="done" aria-label="Mark done" title="Mark done">✓</button></form>
@@ -122,9 +124,67 @@ function moveSelect(t: Task): string {
   return `<form class="move" method="post" action="/status"><input type="hidden" name="id" value="${t.id}"><select name="status" onchange="this.form.submit()" aria-label="Move task">${opts}</select></form>`;
 }
 
-const ADD_FORM = `<form class="add" method="post" action="/add" onsubmit="var b=this.querySelector('button');b.textContent='Adding…';b.disabled=true">
-  <input name="text" autofocus autocomplete="off" placeholder="Add a task — e.g. PR 600 review from Alice, due Friday">
-  <button>Add</button>
+// Tasks lead with the PR number (`PR 637 Review`); only that anchored form earns a GitHub lookup.
+export function prNumber(title: string): number | null {
+  const match = title.match(/^PR\s+(\d+)\b/i);
+  return match ? Number(match[1]) : null;
+}
+
+function prBadge(title: string, prStatuses: Map<number, string>): string {
+  const num = prNumber(title);
+  const state = num !== null ? prStatuses.get(num) : undefined;
+  if (num === null || !state) return '';
+  const href = `https://github.com/${process.env.TODO_GH_REPO}/pull/${num}`;
+  return `<a class="pr-status ${state}" href="${href}" target="_blank" rel="noopener">${state}</a>`;
+}
+
+// Live GitHub state, behind TODO_GH_REPO (kept out of git). Cached briefly so reloads stay snappy;
+// any failure (no repo, not authed, unknown PR, timeout) just drops the badge.
+interface CachedState {
+  state: string;
+  at: number;
+}
+const PR_CACHE = new Map<number, CachedState>();
+const PR_TTL_SEC = 60;
+const GH_TIMEOUT_MS = 3000;
+
+async function fetchPrStatuses(numbers: number[]): Promise<Map<number, string>> {
+  const repo = process.env.TODO_GH_REPO;
+  const result = new Map<number, string>();
+  if (!repo) return result;
+  const now = nowSec();
+  const stale = [...new Set(numbers)].filter((n) => (now - (PR_CACHE.get(n)?.at ?? 0)) > PR_TTL_SEC);
+  await Promise.all(
+    stale.map(async (n) => {
+      const state = await ghPrState(repo, n);
+      if (state) PR_CACHE.set(n, { state, at: nowSec() });
+    }),
+  );
+  for (const n of numbers) {
+    const cached = PR_CACHE.get(n);
+    if (cached) result.set(n, cached.state);
+  }
+  return result;
+}
+
+async function ghPrState(repo: string, num: number): Promise<string | null> {
+  try {
+    const proc = Bun.spawn(['gh', 'pr', 'view', String(num), '--repo', repo, '--json', 'state,isDraft'], { stdout: 'pipe', stderr: 'ignore' });
+    const timeout = setTimeout(() => proc.kill(), GH_TIMEOUT_MS);
+    const [out, code] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
+    clearTimeout(timeout);
+    if (code !== 0) return null;
+    const { state, isDraft } = JSON.parse(out) as { state?: string; isDraft?: boolean };
+    if (!state) return null;
+    return isDraft && state === 'OPEN' ? 'draft' : state.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+const ADD_FORM = `<form class="add" method="post" action="/edit" onsubmit="var b=this.querySelector('button');b.textContent='…';b.disabled=true">
+  <input name="text" autofocus autocomplete="off" placeholder="Tell me what to do — add, complete, move, reword… e.g. mark PR 600 done">
+  <button>Go</button>
 </form>`;
 
 function esc(s: string): string {
@@ -144,7 +204,7 @@ const SHELL = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta 
     --ink: #1d1d1f; --ink-dim: #6e6e73; --ink-faint: #aeaeb2;
     --rounded: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
     --text: -apple-system, "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif;
-    --red: #ff3b30; --yellow: #ff9f0a; --blue: #007aff; --green: #34c759;
+    --red: #ff3b30; --yellow: #ff9f0a; --blue: #007aff; --green: #34c759; --purple: #8250df;
   }
   * { box-sizing: border-box; }
   body {
@@ -216,6 +276,17 @@ const SHELL = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta 
     align-self: flex-start; font: 510 .72rem var(--text); color: var(--ink-dim);
     background: rgba(0,0,0,.05); border-radius: 980px; padding: .3rem .85rem; line-height: 1.3; letter-spacing: 0;
   }
+  .pr-status {
+    align-self: flex-start; font: 590 .66rem var(--text); text-transform: uppercase; letter-spacing: .04em;
+    border-radius: 980px; padding: .22rem .6rem; line-height: 1; text-decoration: none; cursor: pointer;
+    color: var(--badgec); background: color-mix(in srgb, var(--badgec) 14%, transparent);
+    transition: background .15s ease;
+  }
+  .pr-status:hover { background: color-mix(in srgb, var(--badgec) 26%, transparent); }
+  .pr-status.merged { --badgec: var(--purple); }
+  .pr-status.open { --badgec: var(--green); }
+  .pr-status.closed { --badgec: var(--red); }
+  .pr-status.draft { --badgec: var(--ink-faint); }
 
   .actions { display: flex; align-items: center; gap: 1.1rem; flex: none; padding-left: .5rem; }
   /* keep resting rows clean — reveal the move-to-column control on hover/focus */

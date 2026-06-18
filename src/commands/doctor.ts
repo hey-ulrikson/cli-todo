@@ -3,9 +3,9 @@ import { allOk, formatChecks, runChecks } from '../doctor';
 import { resolveDbPath } from '../util';
 
 export function runDoctor(): void {
-  const claudeBinary = Bun.which('claude');
   const results = runChecks({
-    claudeBinary,
+    claudeBinary: Bun.which('claude'),
+    ghBinary: Bun.which('gh'),
     dbPath: resolveDbPath(),
     memoryDir: join(import.meta.dir, '..', '..', 'memory'),
   });
